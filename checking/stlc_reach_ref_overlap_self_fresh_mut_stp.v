@@ -1,3 +1,13 @@
+(*******************************************************************************
+* Coq mechanization of the λ♦ᵣ-calculus [1] and its type checking algorithm.
+* - Syntactic definitions
+* - Semantic definitions
+* - Metatheory
+* - Typing examples
+* - Bidirectional typing algorithm and Metatheory
+* - Type checking examples
+*******************************************************************************)
+
 (* Full safety for STLC *)
 
 (* based on stlc_reach.v and stlc_ref.v *)
@@ -37,9 +47,7 @@ Internals:
 - mirror env V, no val_locs
 - no upper bound on overlap in env_type
 
-
 *)
-
 
 
 Require Import Coq.Lists.List.
@@ -60,6 +68,14 @@ Require Import qualifiers.
 Ltac Tauto.intuition_solver ::= auto with *.
 
 Module STLC.
+
+
+(*******************************************************************************
+* Syntactic Definitions
+* - Typing `has_type`
+* - Subtyping `stp`
+* - Subqualifying `qstp`
+*******************************************************************************)
 
 (* ---------- qualifier sets ---------- *)
 
@@ -231,7 +247,8 @@ Inductive stp : tenv -> ql -> bool -> ty -> bool -> ql -> ty -> bool -> ql -> Pr
     closed_ty (length G) T2 ->
     stp G p false T1 false qempty T2 false qempty ->
     stp G p false T2 false qempty T1 false qempty ->
-    stp G p grf (TRef T1) fr1 q1 (TRef T2) fr2 q2 (* todo: T1 <: T2, T2 <: T1 *)
+    stp G p grf (TRef T1) fr1 q1 (TRef T2) fr2 q2
+(* s-fun/s-depgr *)
 | s_fun: forall G p gr1 T1a q1fn_a q1fr_a q1a T2a q2fn_a q2ar_a q2fr_a q2a qffr_a qfa
                 grf gr2 T1b q1fn_b q1fr_b q1b T2b q2fn_b q2ar_b q2fr_b q2b qffr_b qfb,
     stp G p gr1
@@ -257,6 +274,7 @@ Inductive stp : tenv -> ql -> bool -> ty -> bool -> ql -> ty -> bool -> ql -> Pr
     stp G p grf (* grf: whether it allows to grow locations *)
       (TFun T1a q1fn_a q1fr_a q1a T2a q2fn_a q2ar_a q2fr_a q2a) qffr_a qfa
       (TFun T1b q1fn_b q1fr_b q1b T2b q2fn_b q2ar_b q2fr_b q2b) qffr_b qfb
+(* s-negf *)
 | s_fun_fn1fr1: forall G p grf T1a q1fn_a        q1a T2a q2fn_a q2ar_a q2fr_a q2a qffr_a qfa
                                    q1fn_b q1fr_b q1b                              qffr_b qfb,
     closed_ty (length G) T1a ->
@@ -270,6 +288,7 @@ Inductive stp : tenv -> ql -> bool -> ty -> bool -> ql -> ty -> bool -> ql -> Pr
     stp G p grf
       (TFun T1a q1fn_a true   q1a T2a q2fn_a q2ar_a q2fr_a q2a) qffr_a qfa
       (TFun T1a q1fn_b q1fr_b q1b T2a q2fn_a q2ar_a q2fr_a q2a) qffr_b qfb
+(* s-posx *)
 | s_fun_ar2: forall G p grf T1a q1fn_a q1a T2a q2fn_a q2fr_a q2a qffr_a qfa
                                                q2fn_b q2fr_b q2b qffr_b qfb,
     closed_ty (length G) T1a ->
@@ -282,6 +301,7 @@ Inductive stp : tenv -> ql -> bool -> ty -> bool -> ql -> ty -> bool -> ql -> Pr
     stp G p grf
       (TFun T1a q1fn_a false q1a T2a q2fn_a true  q2fr_a q2a) qffr_a qfa
       (TFun T1a q1fn_a false q1a T2a q2fn_b false q2fr_b q2b) qffr_b qfb
+(* s-grow *)
 | s_fun_fn2: forall G p T1a q1fn_a q1fr_a q1a T2a q2fn_a q2ar_a q2fr_a q2a qffr_a qfa
                                                          q2ar_b q2fr_b q2b qffr_b qfb,
     closed_ty (length G) T1a ->
@@ -337,6 +357,7 @@ Inductive has_type : tenv -> tm -> ty -> ql -> bool -> ql -> Prop :=
     has_type env t1 (TRef TBool) p fr1 q1 ->
     has_type env t2 TBool p fr2 q2 ->
     has_type env (tput t1 t2) TBool p false qempty
+(* combinded application rule for all cases *)
 | t_app: forall env f t T1 T2 p frf qf frx qx fn1 fr1 q1 fn2 ar2 fr2 q2,
     has_type env f (TFun T1 fn1 fr1 q1 T2 fn2 ar2 fr2 q2) p frf qf->
     has_type env t T1 p frx qx ->
@@ -377,17 +398,6 @@ Inductive has_type : tenv -> tm -> ty -> ql -> bool -> ql -> Prop :=
     has_type env (tabs t)
       (TFun T1 fn1 fr1 q1 T2 fn2 ar2 fr2 q2)
       p false qf
-(* | t_sub: forall env y T p fr1 q1 fr2 q2, (* not necessary? *)
-    has_type env y T p fr1 q1 ->
-    psub (plift q1) (plift q2) ->
-    psub (plift q2) (pdom env)  ->
-    has_type env y T p (fr1 || fr2)  q2
-| t_sub_var: forall env y T p fr1 q1 qx x Tx, (* not necessary? *)
-    has_type env y T p fr1 q1 ->
-    plift q1 x ->
-    indexr x env = Some (Tx, false, qx) ->
-    psub (plift qx) (plift p) -> (* necessary? *)
-    has_type env y T p fr1 (qor (qdiff q1 (qone x)) qx) *)
 | t_sub_stp: forall env grf y T1 T2 p fr1 q1 fr2 q2,
     has_type env y T1 p fr1 q1 ->
     stp env p grf T1 fr1 q1 T2 fr2 q2 ->
@@ -399,6 +409,15 @@ Inductive has_type : tenv -> tm -> ty -> ql -> bool -> ql -> Prop :=
 .
 
 
+(*******************************************************************************
+* Semantic Definitions
+* - Bigstep Interpreter `teval`
+* - Value Interpretation `val_type`
+* - Semantic Typing `sem_type`
+* - Semantic Subtyping `sem_stp2`
+* - Semantic Subqualifying `sem_qstp`
+* - and various semantic typing rules...
+*******************************************************************************)
 
 (* ---------- operational semantics ---------- *)
 
@@ -4118,6 +4137,13 @@ Proof.
 Qed.
 
 
+(*******************************************************************************
+* Metathoery
+* - Subqualifying `qstp_fundamental`
+* - Subtyping `stp2_fundamental`
+* - Typing `full_total_safety`
+*******************************************************************************)
+
 (* ----- fundamental lemmas ----- *)
 
 Theorem qstp_fundamental : forall G p q1 q2,
@@ -4655,7 +4681,21 @@ Proof.
 Qed.
 
 
-
+(*******************************************************************************
+* Typing Examples
+* - First Version: Box Only
+*   - Transparent `t_box_transparent`, `t_unbox_transparent`, `ex_box_unbox_transparent1`
+*   - Opaque `t_unbox_opaque1`
+* - Second Version (in paper)
+*   - Box
+*     - Transparent `t_box_transparent2`, `t_unbox_transparent2`, `ex_box_unbox_transparent2`
+*     - Opaque `t_unbox_opaque2`
+*     - Subtyping `upcast_box`, `ex_escape1`
+*   - Pair
+*     - Transparent `t_pair_transparent`, `t_fst_transparent`, `t_snd_transparent`
+*     - Opaque `TPair_opaque_fst`, `TPair_opaque_snd`
+*     - Subtyping `t_pair_trans_to_opaque`
+*******************************************************************************)
 
 (* box (single-element pair) *)
 
@@ -5315,10 +5355,7 @@ Proof.
 Qed.
 
 
-
-
-
-(* TODO: pairs *)
+(* pairs *)
 
 Definition tpairf z := tabs(*a:A*) (tabs(*b:B*) (tabs(*f:A=>B=>C*) (tapp (tapp (tvar (2+z)) (tvar z)) (tvar (1+z))))).
 
@@ -5686,6 +5723,15 @@ Unshelve.
   all: apply true.
 Qed.
 
+
+(*******************************************************************************
+* Bidirectional Typing Algorithm and Metathoery
+* - Qualifier Upcast `get_qstp` and soundness `get_qstp_is_sound`
+* - Qualifier Subsumption `check_qstp` and soundness `check_qstp_is_sound`
+* - Subtype Checking `upcast` and soundness `upcast_is_sound`
+* - Avoidance Algorithm `avoidance` and soundness `avoidance_is_sound`
+* - Bidirectional Typing `bidirectional` and soundness `bidirectional_is_sound`
+*******************************************************************************)
 
 Definition bind {A B: Set} (a: option A) (f: A -> option B) :=
   match a with
@@ -6757,6 +6803,14 @@ Proof.
 Unshelve.
   all: apply true.
 Qed.
+
+
+(*******************************************************************************
+* Type Checking Examples
+* - Subtype Checking `upcast_with_pair` (above)
+* - Avoidance Algorithm `avoidance_with_pair_b`, `avoidance_with_pair_a` (above)
+* - End-to-End `pair_example`
+*******************************************************************************)
 
 Definition MkPair z T a1 a2 :=
   tas (tabs (tapp (tapp (tvar z) (tvar a1)) (tvar a2)))

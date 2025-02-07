@@ -10,10 +10,13 @@ Reachability types are a new take on modeling lifetimes and sharing in high-leve
 
 * [`polymorphism`](https://github.com/TiarkRompf/reachability/tree/main/polymorphism/) -- Coq mechanization of the $λ^\diamond$-calculus [2] and its variations, featuring a refined reachability model that scales to parametric type polymorphism.
 
-* [`log-rel-unary`](https://github.com/TiarkRompf/reachability/tree/main/log-rel-unary/) -- Unary logical relations for proving semantic type soundness and termination of $λ^\diamond$, $λ_\varepsilon^\diamond$, and its variants [4].
+* [`log-rel-unary`](https://github.com/TiarkRompf/reachability/tree/main/log-rel-unary/) -- Unary logical relations for proving semantic type soundness and termination of $λ^\diamond$, $λ_\varepsilon^\diamond$, and its variants [4,5].
 
 * [`log-rel-binary`](https://github.com/TiarkRompf/reachability/tree/main/log-rel-binary/) -- Binary logical relations for establishing equational reasoning about $λ^\diamond$, $λ_\varepsilon^\diamond$, and its variants [4].
 
+* [`log-rel-step-indexed`](https://github.com/TiarkRompf/reachability/tree/main/log-rel-step-indexed/) -- Step-indexed logical relations for $λ^\diamond$, $λ_\varepsilon^\diamond$ and its variants [4].
+
+* [`checking`](https://github.com/TiarkRompf/reachability/tree/main/checking/) -- Bidirectional type system $\lambda^\diamond_R$ with decidable type checking/inference, including refined subtyping for self-references [5]
 
 ## Prototype Implementations
 
@@ -28,9 +31,10 @@ polymorphic reachability types [2].
 * [Oliver Bračevac](https://bracevac.org) (Initial mechanization lead 2021-2022)
 * [Guannan Wei](https://continuation.passing.style) (Polymorphism lead 2023-2024)
 * [Yuyan Bao](https://yuyanbao.github.io) (Logical relations lead 2023-2024)
-* [Songlin Jia](https://songlinj.github.io)
+* [Songlin Jia](https://songlinj.github.io) (Type checking lead 2024-2025)
 * [Siyuan He](https://sweetsinpackets.github.io)
 * [David Deng](https://github.com/PROgram52bc)
+* [Yueyang Tang](https://github.com/Emanon42)
 * [Tiark Rompf](https://tiarkrompf.github.io)
 
 ## References
@@ -51,3 +55,6 @@ Oliver Bračevac, Guannan Wei, Luke Jiang, Supun Abeysinghe, Songlin Jia, Siyuan
 Yuyan Bao, Guannan Wei, Oliver Bračevac, Tiark Rompf
 ([pdf](https://arxiv.org/pdf/2309.05885.pdf)).
 
+[5] **Escape with Your Self: Expressive Reachability Types with Sound and Decidable Bidirectional Type Checking** </br>
+Songlin Jia, Guannan Wei, Siyuan He, Yueyang Tang, Yuyan Bao, Tiark Rompf
+([pdf](https://arxiv.org/pdf/2404.08217.pdf)).
