@@ -782,7 +782,7 @@ Inductive has_type : tenv -> qual -> senv -> tm -> ty -> qual -> Prop :=
     closed_tm 2 (‖Γ‖) (‖Σ‖) t ->
     closed_ty 0 (‖Γ‖) (‖Σ‖) (TAll d1 d2 T1 T2) ->
     closed_Qual 0 (‖Γ‖) (‖Σ‖) φ↑ ->
-    d1 ⊑↑ df ->
+    d1 ⊑↑ df ⊔ {♦} ->
     df ⊑↑ φ ->
     ♦∉ df ->
     senv_saturated Σ df ->
@@ -831,7 +831,7 @@ Inductive has_type : tenv -> qual -> senv -> tm -> ty -> qual -> Prop :=
     closed_tm   2 (‖Γ‖) (‖Σ‖) t ->
     closed_ty   0 (‖Γ‖) (‖Σ‖) (TFun d1 d2 T1 T2) ->
     closed_Qual 0 (‖Γ‖) (‖Σ‖) φ↑ ->
-    d1 ⊑↑ df ->
+    d1 ⊑↑ df ⊔ {♦} ->
     df ⊑↑ φ ->
     ♦∉ df ->
     senv_saturated Σ df ->
@@ -1095,7 +1095,7 @@ Inductive vtp: senv -> qual -> tm -> ty -> qual -> Prop :=
   stp [(bind_ty, false, T3, d3); (bind_tm, true, (TAll d1 d2 T1 T2), {♦})] Σ
       (T2 <~²ᵀ ([] : tenv)) (d2 <~²ᵈ ([] : tenv))
       (T4 <~²ᵀ ([] : tenv)) (d4 <~²ᵈ ([] : tenv)) ->
-  d1 ⊑↑ df1 ->
+  d1 ⊑↑ df1 ⊔ {♦} ->
   ♦∉ df1 ->
   senv_saturated Σ df1 ->
   senv_saturated Σ df2 ->
@@ -1137,7 +1137,7 @@ Inductive vtp: senv -> qual -> tm -> ty -> qual -> Prop :=
   stp [(bind_tm, false,T3, d3) ; (bind_tm, true, (TFun d1 d2 T1 T2), {♦})] Σ
       (T2 <~²ᵀ ([] : tenv)) (d2 <~²ᵈ ([] : tenv))
       (T4 <~²ᵀ ([] : tenv)) (d4 <~²ᵈ ([] : tenv)) ->
-  d1 ⊑↑ df1 ->
+  d1 ⊑↑ df1 ⊔ {♦} ->
   ♦∉ df1 ->
   senv_saturated Σ df1 ->
   senv_saturated Σ df2 ->
@@ -2658,7 +2658,7 @@ Lemma weaken_gen : forall {t Γ1 Γ2 φ Σ T d},
     1-3: rewrite app_length; rewrite splice_env_length; simpl;
       replace (‖Γ1‖ + S (‖Γ2‖)) with (S (‖Γ1‖ + ‖Γ2‖)); eauto.
     inversion H0. subst. constructor. 1,2,5: apply splice_qual_closed; auto. 1,2 : apply splice_ty_closed; auto.
-    rewrite subqual_splice_lr'. auto.
+    erewrite <- splice_qual_fresh. rewrite <- splice_qual_qor_dist. rewrite subqual_splice_lr'. auto.
     rewrite subqual_splice_lr'. auto.
     rewrite <- not_fresh_splice_iff. auto.
     eauto.
@@ -2741,7 +2741,8 @@ rewrite wf_senv_splice_id; auto.
     1-3: rewrite app_length; rewrite splice_env_length; simpl;
       replace (‖Γ1‖ + S (‖Γ2‖)) with (S (‖Γ1‖ + ‖Γ2‖)); eauto.
     inversion H0. subst. constructor. 1,2,5: apply splice_qual_closed; auto. 1,2 : apply splice_ty_closed; auto.
-    1,2: rewrite subqual_splice_lr'; auto.
+    erewrite <- splice_qual_fresh. rewrite <- splice_qual_qor_dist. rewrite subqual_splice_lr'. auto.
+    rewrite subqual_splice_lr'; auto.
     eapply senv_saturated_splice; eauto.
     rewrite app_comm_cons.
     replace ((bind_tm, false, T1 ↑ᵀ ‖Γ2‖, d1 ↑ᵈ ‖Γ2‖)
@@ -3398,6 +3399,18 @@ Proof.
   intros. qual_destruct d1; qual_destruct d2; qual_destruct df; unfold_q.
   ndestruct (fvs0 0); simpl;
   ndestruct (fvs 0); simpl; Qcrush.
+Qed.
+
+Lemma subst_qual_subqual_monotone_fresh : forall {d1 d2}, d1 ⊑↑ d2 ⊔ {♦} -> forall {df}, ({0 |-> df }ᵈ d1) ⊑↑ ({0 |-> df }ᵈ d2) ⊔ {♦}.
+Proof.
+  intros. qual_destruct d1; qual_destruct d2; qual_destruct df; unfold_q.
+  ndestruct (fvs0 0); simpl;
+  ndestruct (fvs 0); simpl; Qcrush; eauto.
+  all: try match goal with
+  | [ H : forall x : nat, N_lift _ x -> _ , 
+      H1 : N_lift _ _ |- _ ] => 
+      apply H in H1 
+      end; intuition.
 Qed.
 
 Lemma subst1_just_fv : forall {fr x dy},
@@ -4265,8 +4278,18 @@ Lemma q_trans_senv_wf_senv_non_fresh : forall Σ dx,
 intros. unfold q_trans_senv. apply q_trans''_non_fresh; auto. intros. destruct a. simpl. eapply wf_senv_prop with (l:=x) (T:=t) (q:=q) in H; intuition.
 Qed.
 
+Lemma qand_diamond_r_non_fresh : forall q, ♦∉ q -> (q ⊓ {♦}) = ∅.
+intros. apply Q_lift_eq. Qcrush.
+Qed.
+
+Lemma qand_diamond_r_fresh : forall q, ♦∈ q -> (q ⊓ {♦}) = {♦}.
+intros. apply Q_lift_eq. Qcrush.
+Qed.
+
 Lemma substitution_gen :
-  forall {t Γ φ φ' bd bx Tx dx dx' Σ T d}, (q_trans (Γ ++ [(bd, bx,Tx,dx)]) Σ dx') ⊓ (q_trans (Γ ++ [(bd, bx,Tx,dx)]) Σ φ) ⊑↑ dx -> 
+  forall {t Γ φ φ' bd bx Tx dx dx' Σ T d}, 
+  (q_trans (Γ ++ [(bd, bx,Tx,dx)]) Σ dx') ⊓ (q_trans (Γ ++ [(bd, bx,Tx,dx)]) Σ φ) ⊑↑ dx ->
+  (* (q_trans (Γ ++ [(bd, bx,Tx,dx)]) Σ dx') ⊓ (q_trans (Γ ++ [(bd, bx,Tx,dx)]) Σ φ) ⊑↑ dx ⊔ {♦} -> *)
   has_type (Γ ++ [(bd, bx,Tx,dx)]) φ Σ t T d -> wf_tenv (Γ ++ [(bd, bx,Tx,dx)]) Σ -> wf_senv Σ -> Substq (Γ ++ [(bd, bx,Tx,dx)]) Σ dx dx' ->
         forall {tx}, vtp Σ φ' tx Tx dx' ->
                         has_type ({ 0 |-> Tx ~ dx' }ᴳ Γ) ({ 0 |-> dx' }ᵈ φ) Σ
@@ -4280,7 +4303,9 @@ Lemma substitution_gen :
   induction HT; intros; subst; pose (φs := {0 |-> dx' }ᵈ φ); replace ({0 |-> dx' }ᵈ φ) with φs in *; auto.
   - (* t_tabs *) simpl. apply t_tabs; auto. eapply closed_tm_subst1'; eauto.
     inversion H3. subst. constructor; try eapply closed_ty_subst1'; eauto; eapply closed_qual_subst1'; eauto.
-    eapply closed_qual_subst1'; eauto. apply subst_qual_subqual_monotone; auto. apply subst_qual_subqual_monotone; auto. eauto.
+    eapply closed_qual_subst1'; eauto.
+    erewrite <- subst1_fresh_id. rewrite <- subst1_qor_dist. apply subst_qual_subqual_monotone; auto. 
+    apply subst_qual_subqual_monotone; auto. eauto.
     apply subst1_senv_saturated; auto.
     (* 1. instantiate the IH *)
     replace (length (Γ0 ++ [(bd, bx, Tx, dx)])) with (S (‖Γ0‖)) in IHHT.
@@ -4298,14 +4323,15 @@ Lemma substitution_gen :
     erewrite <- open_subst1_qual_comm in IHHT; eauto. erewrite <- open_subst1_qual_comm in IHHT; eauto. repeat erewrite subst1_qor_dist in IHHT. apply IHHT; auto. 
     apply has_type_filter in HT as Hft.
     subst. 
-    inversion H3. subst. rewrite app_length in *. simpl in *. rewrite Nat.add_1_r in *. 
+    inversion H3. subst. rewrite app_length in *. simpl in *. rewrite Nat.add_1_r in *.
     repeat rewrite <- q_trans_or_dist. repeat rewrite qand_qor_dist_l. assert (Hqn: closed_qenv_qn (S (‖ Γ0 ‖)) ((bind_ty, false, T1, d1) :: (bind_tm, true, TAll d1 d2 T1 T2, df) :: Γ0 ++ [(bd, bx, Tx, dx)])). {
       unfold closed_qenv_qn. intros. 
     bdestruct (x =? (S (S (‖ Γ0 ‖)))). replace x with (‖ (bind_tm, true, TAll d1 d2 T1 T2, df) :: Γ0 ++ [(bd, bx, Tx, dx)] ‖) in *. rewrite indexr_head in H9. inversion H9. subst. simpl. Qcrush. subst. simpl. rewrite app_length. simpl. lia. 
     bdestruct (x =? (S (‖ Γ0 ‖))). replace x with (‖ Γ0 ++ [(bd, bx, Tx, dx)] ‖) in *. rewrite indexr_skip in H9; auto. rewrite indexr_head in H9. inversion H9. subst. simpl. Qcrush. subst. simpl. rewrite app_length. simpl. lia.
     rewrite indexr_skip in H9; auto. rewrite indexr_skip in H9; auto. destruct a as [ [ [ b fr ] T' ] q']. eapply wf_tenv_prop in HwfΓ; eauto. simpl. apply indexr_var_some' in H9. rewrite app_length in *. simpl in *. rewrite Nat.add_1_r in *. eapply closed_Nats_mono; eauto. Qcrush. 1,2: subst; simpl; rewrite app_length; simpl; lia.
     }
-    repeat apply Subq_qor_l. unfold q_trans,q_trans_tenv. repeat erewrite q_trans''_extend_closed_id'. rewrite q_trans''_fuel_max. eapply @Subq_trans with (d2:=(q_trans (Γ0 ++ [(bd, bx, Tx, dx)]) Σ dx' ⊓ q_trans (Γ0 ++ [(bd, bx, Tx, dx)]) Σ φ)); eauto. unfold q_trans,q_trans_tenv. eapply Subq_qand_split; eauto. 
+    repeat apply Subq_qor_l. unfold q_trans,q_trans_tenv. repeat erewrite q_trans''_extend_closed_id'. rewrite q_trans''_fuel_max. eapply @Subq_trans with (d2:=(q_trans (Γ0 ++ [(bd, bx, Tx, dx)]) Σ dx' ⊓ q_trans (Γ0 ++ [(bd, bx, Tx, dx)]) Σ φ)); eauto. unfold q_trans,q_trans_tenv. 
+    eapply Subq_qand_split; eauto. 
     repeat eapply q_trans''_subq; eauto. rewrite q_trans''_fuel_max. apply q_trans''_subq; auto. 1,2: simpl; lia. 
     eapply closed_qenv_qn_monotone; eauto.
     1-3: simpl; rewrite app_length; simpl; rewrite Nat.add_1_r. 
@@ -4328,20 +4354,21 @@ Lemma substitution_gen :
     simpl; rewrite app_length; simpl; lia.
     1,2: simpl; rewrite app_length; simpl; rewrite Nat.add_1_r.
     eapply closed_qenv_qn_shrink in Hqn; eauto.
-    Qcrush. 
-    replace (S (S (‖ Γ0 ‖))) with (‖ (bind_tm, true, TAll d1 d2 T1 T2, df) :: Γ0 ++ [(bd, bx, Tx, dx)] ‖). rewrite q_trans_fv. rewrite qand_qor_dist_l. erewrite qglb_disjoint_freshv; eauto. rewrite qor_empty_right. rewrite q_trans_extend_tenv_closed_id'. eapply @Subq_trans with (d2:=(q_trans (Γ0 ++ [(bd, bx, Tx, dx)]) Σ dx' ⊓ q_trans (Γ0 ++ [(bd, bx, Tx, dx)]) Σ φ)); eauto. apply Subq_qand_split; auto.  
-    rewrite q_trans_extend_tenv_closed_id'; auto. 
-    eapply closed_qenv_qn_shrink in Hqn; eauto. 
-    eapply closed_Nats_mono with (n:=0). Qcrush. lia.
-    rewrite q_trans_extend_tenv_closed_id'. apply q_trans_subq. eapply Subq_trans; eauto.
+    Qcrush.
+    replace (S (S (‖ Γ0 ‖))) with (‖ (bind_tm, true, TAll d1 d2 T1 T2, df) :: Γ0 ++ [(bd, bx, Tx, dx)] ‖). rewrite q_trans_fv. rewrite qand_qor_dist_l. erewrite qglb_disjoint_freshv; eauto. rewrite qor_empty_right. rewrite q_trans_extend_tenv_closed_id'. rewrite q_trans_extend_tenv_closed_id'. rewrite q_trans_extend_tenv_closed_id'.
+eapply @Subq_trans with (d2:=(q_trans (Γ0 ++ [(bd, bx, Tx, dx)]) Σ dx' ⊓ (q_trans (Γ0 ++ [(bd, bx, Tx, dx)]) Σ (φ ⊔ {♦})))); eauto. 
+apply Subq_qand_split; auto. 
+apply q_trans_subq. eapply Subq_trans; eauto. 
+rewrite <- q_trans_or_dist. rewrite q_trans_freshv_id. rewrite qand_qor_dist_l. rewrite qand_diamond_r_non_fresh. rewrite qor_empty_right; auto. unfold q_trans. apply q_trans_senv_wf_senv_non_fresh; auto. unfold q_trans_tenv. rewrite q_trans''_closed_id; eauto. Qcrush.
     eapply closed_qenv_qn_shrink in Hqn; eauto.
-    simpl; rewrite app_length; simpl; rewrite Nat.add_1_r. Qcrush.
+    rewrite app_length. simpl. rewrite Nat.add_1_r. Qcrush.
     eapply closed_qenv_qn_shrink in Hqn; eauto.
-    simpl. eapply closed_qenv_qn_monotone; eauto. 
-    rewrite app_length. simpl. lia.
     eapply closed_Nats_mono with (n:=0). Qcrush. lia.
-    apply closed_Qual_q_trans''_monotone; eauto using wf_senv_closed_qenv. 
-    unfold q_trans_tenv. rewrite q_trans''_closed_id; auto. Qcrush.
+    eapply closed_qenv_qn_shrink in Hqn; eauto.
+    eapply closed_qenv_qn_monotone; eauto. simpl. rewrite app_length. lia. 
+    eapply closed_Nats_mono with (n:=0). Qcrush. lia.
+    unfold q_trans,q_trans_tenv. rewrite q_trans''_closed_id; auto. 
+    unfold q_trans_senv. apply closed_Qual_q_trans''_monotone; eauto. Qcrush.
     simpl. rewrite app_length. simpl. lia.
     inversion H3. subst. constructor. constructor; auto. eapply closed_Qual_monotone; eauto. eapply closed_ty_monotone; eauto. eapply closed_Qual_monotone; eauto. 
     apply Substq_weaken. simpl; rewrite app_length; simpl. eapply closed_Qual_monotone; eauto. lia. eapply wf_tenv_closed_qenv_qn. econstructor; eauto.
@@ -4480,7 +4507,7 @@ inversion H0. subst. erewrite subst1_ty_id; eauto. inversion HSubst; subst.
       simpl. eapply closed_qual_subst1; eauto.
   - (* t_abs *) simpl. apply t_abs; auto. eapply closed_tm_subst1'; eauto.
     inversion H3. subst. constructor; try eapply closed_ty_subst1'; eauto; eapply closed_qual_subst1'; eauto.
-    eapply closed_qual_subst1'; eauto. apply subst_qual_subqual_monotone; auto. apply subst_qual_subqual_monotone; auto. eauto.
+    eapply closed_qual_subst1'; eauto. Search (_ ⊑↑ _ ⊔ {♦}). apply subst_qual_subqual_monotone_fresh; auto. apply subst_qual_subqual_monotone; auto. eauto.
     apply subst1_senv_saturated; auto.
     (* 1. instantiate the IH *)
     replace (length (Γ0 ++ [(bd, bx, Tx, dx)])) with (S (‖Γ0‖)) in IHHT.
@@ -4528,15 +4555,19 @@ erewrite <- open_subst1_ty_comm in IHHT; eauto. erewrite <- open_subst1_ty_comm 
     1,2: simpl; rewrite app_length; simpl; rewrite Nat.add_1_r.
     eapply closed_qenv_qn_shrink in Hqn; eauto.
     Qcrush. 
-    replace (S (S (‖ Γ0 ‖))) with (‖ (bind_tm, true, TFun d1 d2 T1 T2, df) :: Γ0 ++ [(bd, bx, Tx, dx)] ‖). rewrite q_trans_fv. rewrite qand_qor_dist_l. erewrite qglb_disjoint_freshv; eauto. rewrite qor_empty_right. rewrite q_trans_extend_tenv_closed_id'. eapply @Subq_trans with (d2:=(q_trans (Γ0 ++ [(bd, bx, Tx, dx)]) Σ dx' ⊓ q_trans (Γ0 ++ [(bd, bx, Tx, dx)]) Σ φ)); eauto. apply Subq_qand_split; auto.  
-    rewrite q_trans_extend_tenv_closed_id'; auto. 
+    replace (S (S (‖ Γ0 ‖))) with (‖ (bind_tm, true, TFun d1 d2 T1 T2, df) :: Γ0 ++ [(bd, bx, Tx, dx)] ‖). rewrite q_trans_fv. rewrite qand_qor_dist_l. erewrite qglb_disjoint_freshv; eauto. rewrite qor_empty_right. rewrite q_trans_extend_tenv_closed_id'. 
+eapply @Subq_trans with (d2:=(q_trans ((bind_tm, true, TFun d1 d2 T1 T2, df) :: Γ0 ++ [(bd, bx, Tx, dx)]) Σ dx' ⊓ (q_trans ((bind_tm, true, TFun d1 d2 T1 T2, df) :: Γ0 ++ [(bd, bx, Tx, dx)]) Σ (φ ⊔ {♦})))); eauto. 
+apply Subq_qand_split; auto. 
+apply q_trans_subq. eapply Subq_trans; eauto. 
+rewrite <- q_trans_or_dist. rewrite q_trans_freshv_id. rewrite qand_qor_dist_l. rewrite qand_diamond_r_non_fresh. rewrite qor_empty_right; auto. 
+    repeat rewrite q_trans_extend_tenv_closed_id'; auto. 
+    eapply closed_qenv_qn_shrink in Hqn; eauto. 
+    simpl; rewrite app_length; simpl; rewrite Nat.add_1_r. Qcrush.
     eapply closed_qenv_qn_shrink in Hqn; eauto. 
     eapply closed_Nats_mono with (n:=0). Qcrush. lia.
-    rewrite q_trans_extend_tenv_closed_id'. apply q_trans_subq. eapply Subq_trans; eauto.
+    unfold q_trans. apply q_trans_senv_wf_senv_non_fresh; auto. unfold q_trans_tenv. rewrite q_trans''_closed_id; eauto. Qcrush.
     eapply closed_qenv_qn_shrink in Hqn; eauto.
-    simpl; rewrite app_length; simpl; rewrite Nat.add_1_r. Qcrush.
-    eapply closed_qenv_qn_shrink in Hqn; eauto.
-    simpl. eapply closed_qenv_qn_monotone; eauto. 
+    simpl. eapply closed_qenv_qn_monotone; eauto.
     rewrite app_length. simpl. lia.
     eapply closed_Nats_mono with (n:=0). Qcrush. lia.
     apply closed_Qual_q_trans''_monotone; eauto using wf_senv_closed_qenv. 
@@ -4719,7 +4750,7 @@ Lemma substitution_ty_gen :
   induction HT; intros; subst; pose (φs := {0 |-> dx' }ᵈ φ); replace ({0 |-> dx' }ᵈ φ) with φs in *; auto.
   - (* t_tabs *) simpl. apply t_tabs; auto. eapply closed_tm_subst1'; eauto.
     inversion H0. subst. constructor; try eapply closed_ty_subst1'; eauto; eapply closed_qual_subst1'; eauto.
-    eapply closed_qual_subst1'; eauto. apply subst_qual_subqual_monotone; auto. apply subst_qual_subqual_monotone; auto. eauto.
+    eapply closed_qual_subst1'; eauto. apply subst_qual_subqual_monotone_fresh; auto. apply subst_qual_subqual_monotone; auto. eauto.
     apply subst1_senv_saturated; auto.
     (* 1. instantiate the IH *)
     replace (length (Γ0 ++ [(bind_ty, bx, Tx, dx)])) with (S (‖Γ0‖)) in IHHT.
@@ -4737,14 +4768,15 @@ Lemma substitution_ty_gen :
     erewrite <- open_subst1_qual_comm in IHHT; eauto. erewrite <- open_subst1_qual_comm in IHHT; eauto. repeat erewrite subst1_qor_dist in IHHT. apply IHHT; auto. 
     apply has_type_filter in HT as Hft.
     subst. 
-    inversion H3. subst. rewrite app_length in *. simpl in *. rewrite Nat.add_1_r in *. 
+    inversion H0. subst. rewrite app_length in *. simpl in *. rewrite Nat.add_1_r in *.
     repeat rewrite <- q_trans_or_dist. repeat rewrite qand_qor_dist_l. assert (Hqn: closed_qenv_qn (S (‖ Γ0 ‖)) ((bind_ty, false, T1, d1) :: (bind_tm, true, TAll d1 d2 T1 T2, df) :: Γ0 ++ [(bind_ty, bx, Tx, dx)])). {
-      unfold closed_qenv_qn. intros. rename H8 into HHH.
-    bdestruct (x =? (S (S (‖ Γ0 ‖)))). replace x with (‖ (bind_tm, true, TAll d1 d2 T1 T2, df) :: Γ0 ++ [(bind_ty, bx, Tx, dx)] ‖) in *. rewrite indexr_head in HHH. inversion HHH. subst. simpl. Qcrush. subst. simpl. rewrite app_length. simpl. lia. 
-    bdestruct (x =? (S (‖ Γ0 ‖))). replace x with (‖ Γ0 ++ [(bind_ty, bx, Tx, dx)] ‖) in *. rewrite indexr_skip in HHH; auto. rewrite indexr_head in HHH. inversion HHH. subst. simpl. Qcrush. subst. simpl. rewrite app_length. simpl. lia.
-    rewrite indexr_skip in HHH; auto. rewrite indexr_skip in HHH; auto. destruct a as [ [ [ b fr ] T' ] q']. eapply wf_tenv_prop in HwfΓ; eauto. simpl. apply indexr_var_some' in HHH. rewrite app_length in *. simpl in *. rewrite Nat.add_1_r in *. eapply closed_Nats_mono; eauto. Qcrush. 1,2: subst; simpl; rewrite app_length; simpl; lia.
+      unfold closed_qenv_qn. intros. 
+    bdestruct (x =? (S (S (‖ Γ0 ‖)))). replace x with (‖ (bind_tm, true, TAll d1 d2 T1 T2, df) :: Γ0 ++ [(bind_ty, bx, Tx, dx)] ‖) in *. rewrite indexr_head in H6. inversion H6. subst. simpl. Qcrush. subst. simpl. rewrite app_length. simpl. lia. 
+    bdestruct (x =? (S (‖ Γ0 ‖))). replace x with (‖ Γ0 ++ [(bind_ty, bx, Tx, dx)] ‖) in *. rewrite indexr_skip in H6; auto. rewrite indexr_head in H6. inversion H6. subst. simpl. Qcrush. subst. simpl. rewrite app_length. simpl. lia.
+    rewrite indexr_skip in H6; auto. rewrite indexr_skip in H6; auto. destruct a as [ [ [ b fr ] T' ] q']. eapply wf_tenv_prop in HwfΓ; eauto. simpl. apply indexr_var_some' in H6. rewrite app_length in *. simpl in *. rewrite Nat.add_1_r in *. eapply closed_Nats_mono; eauto. Qcrush. 1,2: subst; simpl; rewrite app_length; simpl; lia.
     }
-    repeat apply Subq_qor_l. unfold q_trans,q_trans_tenv. repeat erewrite q_trans''_extend_closed_id'. rewrite q_trans''_fuel_max. eapply @Subq_trans with (d2:=(q_trans (Γ0 ++ [(bind_ty, bx, Tx, dx)]) Σ dx' ⊓ q_trans (Γ0 ++ [(bind_ty, bx, Tx, dx)]) Σ φ)); eauto. unfold q_trans,q_trans_tenv. eapply Subq_qand_split; eauto. 
+    repeat apply Subq_qor_l. unfold q_trans,q_trans_tenv. repeat erewrite q_trans''_extend_closed_id'. rewrite q_trans''_fuel_max. eapply @Subq_trans with (d2:=(q_trans (Γ0 ++ [(bind_ty, bx, Tx, dx)]) Σ dx' ⊓ q_trans (Γ0 ++ [(bind_ty, bx, Tx, dx)]) Σ φ)); eauto. unfold q_trans,q_trans_tenv. 
+    eapply Subq_qand_split; eauto. 
     repeat eapply q_trans''_subq; eauto. rewrite q_trans''_fuel_max. apply q_trans''_subq; auto. 1,2: simpl; lia. 
     eapply closed_qenv_qn_monotone; eauto.
     1-3: simpl; rewrite app_length; simpl; rewrite Nat.add_1_r. 
@@ -4767,20 +4799,21 @@ Lemma substitution_ty_gen :
     simpl; rewrite app_length; simpl; lia.
     1,2: simpl; rewrite app_length; simpl; rewrite Nat.add_1_r.
     eapply closed_qenv_qn_shrink in Hqn; eauto.
-    Qcrush. 
-    replace (S (S (‖ Γ0 ‖))) with (‖ (bind_tm, true, TAll d1 d2 T1 T2, df) :: Γ0 ++ [(bind_ty, bx, Tx, dx)] ‖). rewrite q_trans_fv. rewrite qand_qor_dist_l. erewrite qglb_disjoint_freshv; eauto. rewrite qor_empty_right. rewrite q_trans_extend_tenv_closed_id'. eapply @Subq_trans with (d2:=(q_trans (Γ0 ++ [(bind_ty, bx, Tx, dx)]) Σ dx' ⊓ q_trans (Γ0 ++ [(bind_ty, bx, Tx, dx)]) Σ φ)); eauto. apply Subq_qand_split; auto.  
-    rewrite q_trans_extend_tenv_closed_id'; auto. 
-    eapply closed_qenv_qn_shrink in Hqn; eauto. 
-    eapply closed_Nats_mono with (n:=0). Qcrush. lia.
-    rewrite q_trans_extend_tenv_closed_id'. apply q_trans_subq. eapply Subq_trans; eauto.
+    Qcrush.
+    replace (S (S (‖ Γ0 ‖))) with (‖ (bind_tm, true, TAll d1 d2 T1 T2, df) :: Γ0 ++ [(bind_ty, bx, Tx, dx)] ‖). rewrite q_trans_fv. rewrite qand_qor_dist_l. erewrite qglb_disjoint_freshv; eauto. rewrite qor_empty_right. rewrite q_trans_extend_tenv_closed_id'. rewrite q_trans_extend_tenv_closed_id'. rewrite q_trans_extend_tenv_closed_id'.
+eapply @Subq_trans with (d2:=(q_trans (Γ0 ++ [(bind_ty, bx, Tx, dx)]) Σ dx' ⊓ (q_trans (Γ0 ++ [(bind_ty, bx, Tx, dx)]) Σ (φ ⊔ {♦})))); eauto. 
+apply Subq_qand_split; auto. 
+apply q_trans_subq. eapply Subq_trans; eauto. 
+rewrite <- q_trans_or_dist. rewrite q_trans_freshv_id. rewrite qand_qor_dist_l. rewrite qand_diamond_r_non_fresh. rewrite qor_empty_right; auto. unfold q_trans. apply q_trans_senv_wf_senv_non_fresh; auto. unfold q_trans_tenv. rewrite q_trans''_closed_id; eauto. Qcrush.
     eapply closed_qenv_qn_shrink in Hqn; eauto.
-    simpl; rewrite app_length; simpl; rewrite Nat.add_1_r. Qcrush.
+    rewrite app_length. simpl. rewrite Nat.add_1_r. Qcrush.
     eapply closed_qenv_qn_shrink in Hqn; eauto.
-    simpl. eapply closed_qenv_qn_monotone; eauto. 
-    rewrite app_length. simpl. lia.
     eapply closed_Nats_mono with (n:=0). Qcrush. lia.
-    apply closed_Qual_q_trans''_monotone; eauto using wf_senv_closed_qenv. 
-    unfold q_trans_tenv. rewrite q_trans''_closed_id; auto. Qcrush.
+    eapply closed_qenv_qn_shrink in Hqn; eauto.
+    eapply closed_qenv_qn_monotone; eauto. simpl. rewrite app_length. lia.
+    eapply closed_Nats_mono with (n:=0). Qcrush. lia.
+    unfold q_trans,q_trans_tenv. rewrite q_trans''_closed_id; auto. 
+    unfold q_trans_senv. apply closed_Qual_q_trans''_monotone; eauto. Qcrush.
     simpl. rewrite app_length. simpl. lia.
     inversion H0. subst. constructor. constructor; auto. eapply closed_Qual_monotone; eauto. eapply closed_ty_monotone; eauto. eapply closed_Qual_monotone; eauto. 
     apply Substq_weaken. simpl; rewrite app_length; simpl. eapply closed_Qual_monotone; eauto. lia. eapply wf_tenv_closed_qenv_qn. econstructor; eauto.
@@ -4906,13 +4939,13 @@ apply closed_Qual_q_trans''_monotone. eapply closed_qual_subst1; eauto. eapply c
     simpl. eapply closed_qual_subst1; eauto.
   - (* t_abs *) simpl. apply t_abs; auto. eapply closed_tm_subst1'; eauto.
     inversion H0. subst. constructor; try eapply closed_ty_subst1'; eauto; eapply closed_qual_subst1'; eauto.
-    eapply closed_qual_subst1'; eauto. apply subst_qual_subqual_monotone; auto. apply subst_qual_subqual_monotone; auto. eauto.
+    eapply closed_qual_subst1'; eauto. apply subst_qual_subqual_monotone_fresh; auto. apply subst_qual_subqual_monotone; auto. eauto.
     apply subst1_senv_saturated; auto.
     (* 1. instantiate the IH *)
     replace (length (Γ0 ++ [(bind_ty, bx, Tx, dx)])) with (S (‖Γ0‖)) in IHHT.
     rewrite subst1_env_length. rewrite app_comm_cons in IHHT. rewrite app_comm_cons in IHHT.
-    remember (df ⊔ $!(S (‖Γ0‖)) ⊔ $!(S (S (‖Γ0‖)))) as DF.
-    replace ({0 |-> dx' }ᵈ df ⊔ $!(‖Γ0‖) ⊔ $!(S (‖Γ0‖))) with ({0 |-> dx' }ᵈ DF).
+    remember (df ⊔ $!(S (‖Γ0‖)) ⊔ $!(S (S (‖Γ0‖))) ⊔ {♦}) as DF.
+    replace ({0 |-> dx' }ᵈ df ⊔ $!(‖Γ0‖) ⊔ $!(S (‖Γ0‖)) ⊔ {♦}) with ({0 |-> dx' }ᵈ DF).
     intuition. specialize IHHT with (Γ := (((bind_tm, false,T1, d1) :: (bind_tm, true, (TFun d1 d2 T1 T2), df) :: Γ0))).
     (* 2. reason about opening and subst, apply IH *)
     unfold open_tm' in *. unfold open_ty' in *. unfold open_ty in *.
@@ -4920,12 +4953,11 @@ apply closed_Qual_q_trans''_monotone. eapply closed_qual_subst1; eauto. eapply c
     rewrite app_length in IHHT. rewrite subst1_env_length. simpl in *.
     replace (‖Γ0‖ + 1) with (S (‖Γ0‖)) in IHHT; try lia.
     erewrite <- open_subst1_tm_comm in IHHT; eauto. erewrite <- open_subst1_tm_comm in IHHT; eauto.
-    erewrite <- open_subst1_ty_comm in IHHT; eauto. erewrite <- open_subst1_ty_comm in IHHT; eauto.
-    erewrite <- open_subst1_qual_comm in IHHT; eauto. erewrite <- open_subst1_qual_comm in IHHT; eauto. repeat erewrite subst1_qor_dist in IHHT. apply IHHT; auto. 
+erewrite <- open_subst1_ty_comm in IHHT; eauto. erewrite <- open_subst1_ty_comm in IHHT; eauto. erewrite <- open_subst1_qual_comm in IHHT; eauto. erewrite <- open_subst1_qual_comm in IHHT; eauto. repeat erewrite subst1_qor_dist in IHHT. apply IHHT; auto. 
     apply has_type_filter in HT as Hft.
-    subst. 
+    subst.
     inversion H0. subst. rewrite app_length in *. simpl in *. rewrite Nat.add_1_r in *. 
-    repeat rewrite <- q_trans_or_dist. repeat rewrite qand_qor_dist_l. assert (Hqn: closed_qenv_qn (S (‖ Γ0 ‖)) ((bind_tm, false, T1, d1) :: (bind_tm, true, TFun d1 d2 T1 T2, df) :: Γ0 ++ [(bind_ty, bx, Tx, dx)])). {
+    repeat rewrite <- q_trans_or_dist. repeat rewrite qand_qor_dist_l. assert (Hqn: closed_qenv_qn (S (‖ Γ0 ‖)) ((bind_ty, false, T1, d1) :: (bind_tm, true, TFun d1 d2 T1 T2, df) :: Γ0 ++ [(bind_ty, bx, Tx, dx)])). {
       unfold closed_qenv_qn. intros. 
     bdestruct (x =? (S (S (‖ Γ0 ‖)))). replace x with (‖ (bind_tm, true, TFun d1 d2 T1 T2, df) :: Γ0 ++ [(bind_ty, bx, Tx, dx)] ‖) in *. rewrite indexr_head in H6. inversion H6. subst. simpl. Qcrush. subst. simpl. rewrite app_length. simpl. lia. 
     bdestruct (x =? (S (‖ Γ0 ‖))). replace x with (‖ Γ0 ++ [(bind_ty, bx, Tx, dx)] ‖) in *. rewrite indexr_skip in H6; auto. rewrite indexr_head in H6. inversion H6. subst. simpl. Qcrush. subst. simpl. rewrite app_length. simpl. lia.
@@ -4955,15 +4987,19 @@ apply closed_Qual_q_trans''_monotone. eapply closed_qual_subst1; eauto. eapply c
     1,2: simpl; rewrite app_length; simpl; rewrite Nat.add_1_r.
     eapply closed_qenv_qn_shrink in Hqn; eauto.
     Qcrush. 
-    replace (S (S (‖ Γ0 ‖))) with (‖ (bind_tm, true, TFun d1 d2 T1 T2, df) :: Γ0 ++ [(bind_ty, bx, Tx, dx)] ‖). rewrite q_trans_fv. rewrite qand_qor_dist_l. erewrite qglb_disjoint_freshv; eauto. rewrite qor_empty_right. rewrite q_trans_extend_tenv_closed_id'. eapply @Subq_trans with (d2:=(q_trans (Γ0 ++ [(bind_ty, bx, Tx, dx)]) Σ dx' ⊓ q_trans (Γ0 ++ [(bind_ty, bx, Tx, dx)]) Σ φ)); eauto. apply Subq_qand_split; auto.  
-    rewrite q_trans_extend_tenv_closed_id'; auto. 
+    replace (S (S (‖ Γ0 ‖))) with (‖ (bind_tm, true, TFun d1 d2 T1 T2, df) :: Γ0 ++ [(bind_ty, bx, Tx, dx)] ‖). rewrite q_trans_fv. rewrite qand_qor_dist_l. erewrite qglb_disjoint_freshv; eauto. rewrite qor_empty_right. rewrite q_trans_extend_tenv_closed_id'. 
+eapply @Subq_trans with (d2:=(q_trans ((bind_tm, true, TFun d1 d2 T1 T2, df) :: Γ0 ++ [(bind_ty, bx, Tx, dx)]) Σ dx' ⊓ (q_trans ((bind_tm, true, TFun d1 d2 T1 T2, df) :: Γ0 ++ [(bind_ty, bx, Tx, dx)]) Σ (φ ⊔ {♦})))); eauto. 
+apply Subq_qand_split; auto. 
+apply q_trans_subq. eapply Subq_trans; eauto. 
+rewrite <- q_trans_or_dist. rewrite q_trans_freshv_id. rewrite qand_qor_dist_l. rewrite qand_diamond_r_non_fresh. rewrite qor_empty_right; auto. 
+    repeat rewrite q_trans_extend_tenv_closed_id'; auto. 
+    eapply closed_qenv_qn_shrink in Hqn; eauto. 
+    simpl; rewrite app_length; simpl; rewrite Nat.add_1_r. Qcrush.
     eapply closed_qenv_qn_shrink in Hqn; eauto. 
     eapply closed_Nats_mono with (n:=0). Qcrush. lia.
-    rewrite q_trans_extend_tenv_closed_id'. apply q_trans_subq. eapply Subq_trans; eauto.
+    unfold q_trans. apply q_trans_senv_wf_senv_non_fresh; auto. unfold q_trans_tenv. rewrite q_trans''_closed_id; eauto. Qcrush.
     eapply closed_qenv_qn_shrink in Hqn; eauto.
-    simpl; rewrite app_length; simpl; rewrite Nat.add_1_r. Qcrush.
-    eapply closed_qenv_qn_shrink in Hqn; eauto.
-    simpl. eapply closed_qenv_qn_monotone; eauto. 
+    simpl. eapply closed_qenv_qn_monotone; eauto.
     rewrite app_length. simpl. lia.
     eapply closed_Nats_mono with (n:=0). Qcrush. lia.
     apply closed_Qual_q_trans''_monotone; eauto using wf_senv_closed_qenv. 
@@ -4973,7 +5009,8 @@ apply closed_Qual_q_trans''_monotone. eapply closed_qual_subst1; eauto. eapply c
     apply Substq_weaken. simpl; rewrite app_length; simpl. eapply closed_Qual_monotone; eauto. lia. eapply wf_tenv_closed_qenv_qn. econstructor; eauto.
     apply Substq_weaken; eauto. simpl; rewrite app_length; simpl. eapply closed_Qual_monotone; eauto. lia.
     subst DF. repeat rewrite subst1_qor_dist.
-    erewrite <- @subst1_just_fv with (x:=(‖ Γ0 ‖)). erewrite <- @subst1_just_fv with (x:=(S (‖ Γ0 ‖))). auto. rewrite app_length. simpl. lia.
+    erewrite <- @subst1_just_fv with (x:=(‖ Γ0 ‖)). erewrite <- @subst1_just_fv with (x:=(S (‖ Γ0 ‖))). rewrite subst1_fresh_id. auto. rewrite app_length. simpl. lia.
+
   - (* t_app *) intuition. rename H3 into IHHT1. rename H5 into IHHT2. simpl.
     replace ({ 0 |-> dx' }ᵈ (openq df d1 d2)) with
                (openq ({ 0 |-> dx' }ᵈ df) ({ 0 |-> dx' }ᵈ d1) ({ 0 |-> dx' }ᵈ d2)).
@@ -6059,9 +6096,7 @@ auto.
         apply has_type_vtp in H as VH; intuition.
         apply vtp_canonical_form_lam in VH as HH; intuition.
         specialize (H12 σ). intuition.
-
         destruct H9 as [t2' [σ' HH22]]. exists (tapp t1 t2'). exists σ'. intuition. constructor; intuition.
-
         destruct H12. destruct (♦∈? d1) eqn:Hfresh.
         * (* d1 fresh *)
           inversion H14. subst. ndestruct (qbvs d2 1).
