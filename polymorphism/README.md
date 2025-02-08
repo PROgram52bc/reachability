@@ -7,6 +7,7 @@ The $λ^\diamond$-calculus [1], a refined reachability model that scales to para
 * [`Base`](lambda_diamond_base) -- Base system introducing the new reachability model, lacking type polymorphism.
 * [`Fsub`](f_sub_diamond) -- Bounded type-and-reachability polymorphism.
 * [`Trans`](f_sub_trans) -- Bounded type-and-reachability polymorphism with explicit transitive closure.
+* [`SelfNat`](f_sub_self_nat) -- Bounded type-and-reachability polymorphism with self references and natural numbers.
 
 ```mermaid
 graph TD
@@ -14,9 +15,11 @@ graph TD
       Base
       Fsub
 	  Trans
+	  SelfNat
     end
     Base-->Fsub
 	Base-->Trans
+	Trans-->SelfNat
 ```
 
 ## References
